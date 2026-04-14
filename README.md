@@ -2,7 +2,7 @@
 
 A lightweight TCP bridge that exposes a SocketCAN interface using the **Yacht Devices RAW ASCII** protocol over TCP.
 
-It allows any client that speaks the Yacht Devices RAW ASCII protocol — such as [SignalK](https://signalk.org/), [Actisense NMEA Reader](https://www.actisense.com/), or [OpenCPN](https://opencpn.org/) — to read and write CAN frames over a standard TCP connection.
+It allows any client that speaks the Yacht Devices RAW ASCII protocol — such as [SignalK](https://signalk.org/), [Yacht Devices CAN Log Viewer](https://www.yachtd.com/downloads/#canlog) or [OpenCPN](https://opencpn.org/) — to read and write CAN frames over a standard TCP connection.
 
 ---
 
