@@ -18,8 +18,11 @@ WORKDIR /app
 COPY can2yd.py /app/can2yd.py
 
 # Valeurs par défaut (surchargeables)
+ENV MODE=server
 ENV CAN_IFACE=can0
+ENV TCP_HOST=
 ENV TCP_PORT=2223
+ENV RECONNECT_DELAY=5
 
 # Port TCP RAW ASCII YachtDevices
 EXPOSE 2223

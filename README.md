@@ -8,19 +8,23 @@ It allows any client that speaks the Yacht Devices RAW ASCII protocol — such a
 
 ## How it works
 
-`can2yd` opens a SocketCAN bus and listens on a TCP port. For each CAN frame received on the bus, it broadcasts a line to all connected clients in the Yacht Devices RAW ASCII format:
+In its default `server` mode, `can2yd` opens a SocketCAN bus and listens on a TCP port. Omitting `MODE` preserves the original server behavior. `TCP_HOST` selects the listen address; if it is unset, the server first tries a dual-stack IPv6 wildcard listener (`::`) and falls back to IPv4 (`0.0.0.0`) if IPv6 is unavailable. For each CAN frame received on the bus, it broadcasts a line to all connected clients in the Yacht Devices RAW ASCII format:
 
 ```
 hh:mm:ss.ddd R CANID_HEX [DATA_BYTES_HEX...]
 ```
 
-Clients can also transmit frames by sending lines in the same format with direction `T`:
+Clients can also transmit frames by sending either full RAW ASCII `T` lines or the short transmit format:
 
 ```
 CANID_HEX [DATA_BYTES_HEX...]
 ```
 
 When a client transmits a frame, `can2yd` forwards it onto the CAN bus and echoes a confirmation back to all connected clients.
+
+In `client` mode, `can2yd` opens a local SocketCAN bus and connects to a remote `can2yd` server. Frames received from the remote server are transmitted on the local CAN bus, and frames received from the local CAN bus are sent back to the server. This lets you bridge two SocketCAN interfaces over the network.
+
+For bridge use, run exactly one side as `MODE=server` and the other side as `MODE=client`. The client transmits only remote `R` frames onto its local CAN bus and ignores server `T` confirmations, preventing the normal confirmation echo from being replayed back into the client-side bus.
 
 ---
 
@@ -56,7 +60,21 @@ sudo ip link set vcan0 up
 docker run --rm \
   --network host \
   --cap-add NET_ADMIN \
+  -e MODE=server \
   -e CAN_IFACE=can0 \
+  -e TCP_PORT=2223 \
+  ghcr.io/macjl/can2yd:latest
+```
+
+**Run a client on another host:**
+
+```bash
+docker run --rm \
+  --network host \
+  --cap-add NET_ADMIN \
+  -e MODE=client \
+  -e CAN_IFACE=can0 \
+  -e TCP_HOST=192.168.1.10 \
   -e TCP_PORT=2223 \
   ghcr.io/macjl/can2yd:latest
 ```
@@ -72,7 +90,25 @@ services:
     cap_add:
       - NET_ADMIN
     environment:
+      MODE: server
       CAN_IFACE: can0
+      TCP_PORT: 2223
+```
+
+Client side:
+
+```yaml
+services:
+  can2yd:
+    image: ghcr.io/macjl/can2yd:latest
+    restart: unless-stopped
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+    environment:
+      MODE: client
+      CAN_IFACE: can0
+      TCP_HOST: 192.168.1.10
       TCP_PORT: 2223
 ```
 
@@ -80,17 +116,25 @@ services:
 
 ```bash
 pip install python-can
-CAN_IFACE=can0 TCP_PORT=2223 python can2yd.py
+# Server side
+MODE=server CAN_IFACE=can0 TCP_PORT=2223 python can2yd.py
+
+# Client side
+MODE=client CAN_IFACE=can0 TCP_HOST=192.168.1.10 TCP_PORT=2223 python can2yd.py
 ```
 
 ---
 
 ## Environment variables
 
-| Variable    | Default | Description                        |
-|-------------|---------|------------------------------------|
-| `CAN_IFACE` | `can0`  | SocketCAN interface name           |
-| `TCP_PORT`  | `2223`  | TCP port to listen on              |
+| Variable          | Default  | Description                                               |
+|-------------------|----------|-----------------------------------------------------------|
+| `MODE`            | `server` | `server` to listen for clients, `client` to connect out   |
+| `CAN_IFACE`       | `can0`   | SocketCAN interface name                                  |
+| `TCP_HOST`        | unset    | Server listen address in `server` mode, default dual-stack `::` with IPv4 fallback; target server host or IP in `client` mode, required |
+| `TCP_PORT`        | `2223`   | TCP port to listen on or connect to                       |
+| `RECONNECT_DELAY` | `5`      | Client reconnect delay in seconds                         |
+| `CAN_TX_QUEUE_LIMIT` | `1024` | Maximum frames pending for transmission to SocketCAN; excess frames are dropped while the CAN interface is saturated |
 
 ---
 
